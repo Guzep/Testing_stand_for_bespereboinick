@@ -12,7 +12,7 @@ import time
 from Connection_STM import STM_manage
 from Connection_MU import Mu_manage
 
-test_data = [(7, '2', 3.686), (10, '2', 3.686), (15, '2', 3.686), (20, '2', 3.686), (30, '2', 3.686)]
+test_data = [(7, '2', 7), (10, '2', 10), (15, '2', 15), (20, '2', 20), (30, '2', 30)]
 
 
 # класс создания окна
@@ -88,37 +88,58 @@ class TestStandControlApp:
 
     # Кнопка проверка подключения устройств
     def start_test(self):
-        self.power_unit = PowerUnit(self.device_vars[0].get(), 115200)  # Создаем экземпляр PowerUnit с выбранным портом
-        print('подключились к БП')
-        self.mu_manage = Mu_manage(self.device_vars[1].get(), 9600)
-        print('подключились к Му')
-        self.stm_manage = STM_manage(self.device_vars[2].get(), 9600)
-        print('подключились к СТМ')
         for i, com_var in enumerate(self.device_vars):
+            self.log_text.insert(tk.END, f"Проверка подключения")
             port = com_var.get()
             print(port)
             device = self.devices[i]
             color = "red"
-            try:
-                # if i == 0:
-                #     self.parametr()
-                # elif i == 1:
-                #     self.status_poll()
-                # else:
-                #     self.send_pin('00000')
-                #STM_manage.send_pin('00000')
-                #if response != 'b' :
-                color = 'green'
-            except serial.SerialException as e:
-                self.log_text.insert(tk.END, f"Ошибка при открытии порта {port}: {e}\n")
-            self.lamps[i].config(bg=color)
-            self.log_text.insert(tk.END, f"Статус подключения {device} к порту {port}: {color}\n")
-            self.log_text.see(tk.END)
+
+            if i == 0:
+                try:
+                    self.mu_manage = Mu_manage(self.device_vars[1].get(), 9600)
+                    print('подключились к Му')
+                    print(self.mu_manage.parametr(), "СЮДА")
+                    self.mu_manage.__del__()
+                    color = "green"
+                except serial.SerialException as e:
+                    self.log_text.insert(tk.END, f"Ошибка при открытии порта {port}: {e}\n")
+                self.lamps[i].config(bg=color)
+                self.log_text.insert(tk.END, f"Статус подключения {device} к порту {port}: {color}\n")
+                self.log_text.see(tk.END)
+            elif i == 1:
+                try:
+                    self.power_unit = PowerUnit(self.device_vars[0].get(),
+                                                115200)  # Создаем экземпляр PowerUnit с выбранным портом
+                    print('подключились к БП')
+                    self.power_unit.status_poll()
+                    self.power_unit.__del__()
+                    color = "green"
+                except serial.SerialException as e:
+                    self.log_text.insert(tk.END, f"Ошибка при открытии порта {port}: {e}\n")
+                self.lamps[i].config(bg=color)
+                self.log_text.insert(tk.END, f"Статус подключения {device} к порту {port}: {color}\n")
+                self.log_text.see(tk.END)
+            else:
+                try:
+                    self.stm_manage = STM_manage(self.device_vars[2].get(), 9600)
+                    print('подключились к СТМ')
+                    self.stm_manage.send_pin('00000')
+                    self.stm_manage.__del__()
+                    color = "green"
+                except serial.SerialException as e:
+                    self.log_text.insert(tk.END, f"Ошибка при открытии порта {port}: {e}\n")
+                self.lamps[i].config(bg=color)
+                self.log_text.insert(tk.END, f"Статус подключения {device} к порту {port}: {color}\n")
+                self.log_text.see(tk.END)
 
     def start(self, test_data):
-        stm_manager = STM_manage(self.device_vars[2].get(), 9600)
+        self.mu_manage = Mu_manage(self.device_vars[1].get(), 9600)
+        self.stm_manage = STM_manage(self.device_vars[2].get(), 9600)
+        self.power_unit = PowerUnit(self.device_vars[0].get(),
+                                    115200)  # Создаем экземпляр PowerUnit с выбранным портом
         for i, (voltage, pins, expected_voltage) in enumerate(test_data):
-            stm_manager.send_pin(pins)
+            self.stm_manage.send_pin(pins)
             self.power_unit.voltage_change(voltage, True)
             time.sleep(1)  # Подождать, чтобы обеспечить устойчивое измерение
             measured_voltage = self.power_unit.decode_response(self.power_unit.status_poll())["real_voltage"]
@@ -131,7 +152,11 @@ class TestStandControlApp:
                 print("Тест успешно завершен")
                 return
 
-            stm_manager.send_pin('0')
+            self.stm_manage.send_pin('11111')
+
+        self.stm_manage.__del__()
+        self.power_unit.__del__()
+        self.mu_manage.__del__()
         pass
 
     def send_down_command(self):

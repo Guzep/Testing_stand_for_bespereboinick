@@ -47,6 +47,24 @@ class TestStandControlApp:
 
         available_ports = [port.device for port in serial.tools.list_ports.comports()]
 
+        # if self.devices:
+        #     for i, device in enumerate(self.devices):
+        #         label = tk.Label(self.right_frame, text=device)
+        #         label.grid(row=i, column=0, padx=10, pady=5)
+        #
+        #         com_var = tk.StringVar(self.right_frame)
+        #         if available_ports:
+        #             com_var.set(available_ports[i])
+        #         else:
+        #             com_var.set("")  # Set a default value if no ports are available
+        #         option_menu = tk.OptionMenu(self.right_frame, com_var, *available_ports)
+        #         option_menu.grid(row=i, column=1, padx=10, pady=5)
+        #         self.device_vars.append(com_var)  # Add com_var to the list of device_vars
+        #
+        #         lamp = tk.Canvas(self.right_frame, width=20, height=20, bg="white", highlightthickness=0)
+        #         lamp.grid(row=i, column=2, padx=10, pady=5)
+        #         self.lamps.append(lamp)
+
         if self.devices:
             for i, device in enumerate(self.devices):
                 label = tk.Label(self.right_frame, text=device)

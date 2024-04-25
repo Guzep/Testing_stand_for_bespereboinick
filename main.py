@@ -160,7 +160,7 @@ class TestStandControlApp:
             self.stm_manage.send_pin(pins)
             self.power_unit.voltage_change(voltage, True)
             time.sleep(1)  # Подождать, чтобы обеспечить устойчивое измерение
-            measured_voltage = self.power_unit.decode_response(self.power_unit.status_poll())["real_voltage"]
+            measured_voltage = self.mu_manage.parametr()["real_voltage"]
             print(f"Измеренное напряжение: {measured_voltage} В")
             if abs(float(measured_voltage) - expected_voltage) > 0.5:
                 print("Ошибка: Измеренное напряжение не соответствует ожидаемому")

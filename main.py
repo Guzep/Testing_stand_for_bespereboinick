@@ -1,207 +1,191 @@
-import tkinter as tk
-from tkinter import filedialog
-from tkinter.scrolledtext import ScrolledText
-import sys
 from datetime import datetime
-from serial.tools import list_ports
-import serial
-
-import test_PowerUnit
-from test_PowerUnit import PowerUnit
+import tkinter as tk
+from tkinter.scrolledtext import ScrolledText
 import time
-from Connection_STM import STM_manage
-from Connection_MU import Mu_manage
+import threading
+import serial
+from serial.tools import list_ports
+from anbai import anbai
+from test_PowerUnit import PowerUnit
 
-test_data = [(7, '2', 7), (10, '2', 10), (15, '2', 15), (20, '2', 20), (30, '2', 30)]
-
-
-# класс создания окна
+# Основной класс для приложения контроля тестового стенда
 class TestStandControlApp:
     def __init__(self, master):
         self.master = master
-        self.master.title("TXC TESTER")
-        self.master.geometry("900x350")
+        self.master.title("Termal_tester v1.0")
+        self.master.geometry("1000x500")
         self.create_widgets()
+        self.test_counter = 1  # Счетчик тестов
 
-        # sys.stdout = self.CustomStdout(self.log_text)
-        # sys.stderr = self.CustomStdout(self.log_text)
-
-    # класс для кнопок в интерфейсе
+    # Создание интерфейса приложения
     def create_widgets(self):
-        # Разделение окна на две зоны
         self.left_frame = tk.Frame(self.master, width=300, bg="black")
         self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Терминал
         self.log_text = ScrolledText(self.left_frame, bg="black", fg="white")
         self.log_text.pack(fill=tk.BOTH, expand=True)
 
         self.right_frame = tk.Frame(self.master, width=400, bg="lightgray")
         self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        # Правая зона: текстовое окно другого цвета
-        # Создаем список устройств
-        self.devices = ["Мультиметр TH1951", "Блок Питания ODP3032", "Микроконтроллер STM32"]
-        self.device_vars = []
-        self.lamps = []
+        self.devices = ["AT4508", "Блок Питания ODP3032"]
+        self.device_vars = []  # Переменные для выбора COM-портов
+        self.lamps = []  # Индикаторы состояния устройств
 
         available_ports = [port.device for port in serial.tools.list_ports.comports()]
 
-        # if self.devices:
-        #     for i, device in enumerate(self.devices):
-        #         label = tk.Label(self.right_frame, text=device)
-        #         label.grid(row=i, column=0, padx=10, pady=5)
-        #
-        #         com_var = tk.StringVar(self.right_frame)
-        #         if available_ports:
-        #             com_var.set(available_ports[i])
-        #         else:
-        #             com_var.set("")  # Set a default value if no ports are available
-        #         option_menu = tk.OptionMenu(self.right_frame, com_var, *available_ports)
-        #         option_menu.grid(row=i, column=1, padx=10, pady=5)
-        #         self.device_vars.append(com_var)  # Add com_var to the list of device_vars
-        #
-        #         lamp = tk.Canvas(self.right_frame, width=20, height=20, bg="white", highlightthickness=0)
-        #         lamp.grid(row=i, column=2, padx=10, pady=5)
-        #         self.lamps.append(lamp)
+        for i, device in enumerate(self.devices):
+            label = tk.Label(self.right_frame, text=device)
+            label.grid(row=i, column=0, padx=10, pady=5)
 
-        if self.devices:
-            for i, device in enumerate(self.devices):
-                label = tk.Label(self.right_frame, text=device)
-                label.grid(row=i, column=0, padx=10, pady=5)
+            com_var = tk.StringVar(self.right_frame)
+            com_var.set(available_ports[i] if available_ports else "")
+            option_menu = tk.OptionMenu(self.right_frame, com_var, *available_ports)
+            option_menu.grid(row=i, column=1, padx=10, pady=5)
+            self.device_vars.append(com_var)
 
-                com_var = tk.StringVar(self.right_frame)
-                com_var.set(available_ports[i] if available_ports else "")
-                option_menu = tk.OptionMenu(self.right_frame, com_var, *available_ports)
-                # Устанавливаем COM порт по умолчанию, если доступны порты
-                option_menu.grid(row=i, column=1, padx=10, pady=5)
-                self.device_vars.append(com_var)  # Добавляем com_var в список device_vars
+            lamp = tk.Canvas(self.right_frame, width=20, height=20, bg="white", highlightthickness=0)
+            lamp.grid(row=i, column=2, padx=10, pady=5)
+            self.lamps.append(lamp)
 
-                lamp = tk.Canvas(self.right_frame, width=20, height=20, bg="white", highlightthickness=0)
-                lamp.grid(row=i, column=2, padx=10, pady=5)
-                self.lamps.append(lamp)
-
-        # Добавляем кнопку для запуска теста
-        self.start_button = tk.Button(self.right_frame, text="Подключение",
-                                      command=self.start_test)
+        self.start_button = tk.Button(self.right_frame, text="Подключение", command=self.start_test)
         self.start_button.grid(row=len(self.devices), column=0, columnspan=2, padx=10, pady=5)
 
-        tests = ["Test1", "Test2", "Test3", "Test4"]
-        test = tk.StringVar(self.right_frame)
+        self.start_button = tk.Button(self.right_frame, text="Снять сейчас", command=self.form_list_now)
+        self.start_button.grid(row=len(self.devices) + 1, column=0, padx=10, pady=5)
 
-        self.option_test = tk.OptionMenu(self.right_frame, test, *tests)
-        test.set(tests[0])
-        self.option_test.grid(row=len(self.devices) + 1, column=0, padx=5, pady=5)
+        self.start_button = tk.Button(self.right_frame, text="Выбрать время", command=self.open_input_window)
+        self.start_button.grid(row=len(self.devices) + 2, column=0, padx=10, pady=5)
 
-        self.btn_stop = tk.Button(self.right_frame, text="СТОП", width=10, height=4,
-                                  command="", bg="red")
-        self.btn_stop.grid(row=8, column=0, padx=30, pady=30)
-        self.btn_start = tk.Button(self.right_frame, text="СТАРТ", width=8, height=2,
-                                   command=lambda: self.start(test_data), bg="green")
-        self.btn_start.grid(row=4, column=1, padx=30, pady=30)
-        self.btn_pause = tk.Button(self.right_frame, text="ПАУЗА", width=9, height=2,
-                                   command="", bg="lightblue")
-        self.btn_pause.grid(row=8, column=1, padx=30, pady=30)
-        print(self.device_vars)
-
-    # Кнопка проверка подключения устройств
+    # Проверка подключения устройств
     def start_test(self):
         for i, com_var in enumerate(self.device_vars):
-            self.log_text.insert(tk.END, f"Проверка подключения")
+            self.log_text.insert(tk.END, f"Проверка подключения\n")
             port = com_var.get()
-            print(port)
             device = self.devices[i]
             color = "red"
 
             if i == 0:
                 try:
-                    self.mu_manage = Mu_manage(self.device_vars[1].get(), 9600)
-                    print('подключились к Му')
-                    print(self.mu_manage.parametr(), "СЮДА")
-                    self.mu_manage.__del__()
+                    self.anbai = anbai(self.device_vars[0].get(), 9600)
+                    print('Подключились к AT4508')
+                    self.anbai.__del__()
                     color = "green"
                 except serial.SerialException as e:
-                    self.log_text.insert(tk.END, f"Ошибка при открытии порта {port}: {e}\n")
+                    self.log_text.insert(tk.END, f"Ошибка при подключении к {port}: {e}\n")
                 self.lamps[i].config(bg=color)
-                self.log_text.insert(tk.END, f"Статус подключения {device} к порту {port}: {color}\n")
-                self.log_text.see(tk.END)
+
             elif i == 1:
                 try:
-                    self.power_unit = PowerUnit(self.device_vars[0].get(),
-                                                115200)  # Создаем экземпляр PowerUnit с выбранным портом
-                    print('подключились к БП')
+                    self.power_unit = PowerUnit(self.device_vars[1].get(), 115200)
+                    print('Подключились к БП')
                     self.power_unit.status_poll()
                     self.power_unit.__del__()
                     color = "green"
                 except serial.SerialException as e:
-                    self.log_text.insert(tk.END, f"Ошибка при открытии порта {port}: {e}\n")
+                    self.log_text.insert(tk.END, f"Ошибка при подключении к {port}: {e}\n")
                 self.lamps[i].config(bg=color)
-                self.log_text.insert(tk.END, f"Статус подключения {device} к порту {port}: {color}\n")
-                self.log_text.see(tk.END)
-            else:
-                try:
-                    self.stm_manage = STM_manage(self.device_vars[2].get(), 9600)
-                    print('подключились к СТМ')
-                    self.stm_manage.send_pin('00000')
-                    self.stm_manage.__del__()
-                    color = "green"
-                except serial.SerialException as e:
-                    self.log_text.insert(tk.END, f"Ошибка при открытии порта {port}: {e}\n")
-                self.lamps[i].config(bg=color)
-                self.log_text.insert(tk.END, f"Статус подключения {device} к порту {port}: {color}\n")
-                self.log_text.see(tk.END)
 
-    def start(self, test_data):
-        self.mu_manage = Mu_manage(self.device_vars[1].get(), 9600)
-        self.stm_manage = STM_manage(self.device_vars[2].get(), 9600)
-        self.power_unit = PowerUnit(self.device_vars[0].get(),
-                                    115200)  # Создаем экземпляр PowerUnit с выбранным портом
-        for i, (voltage, pins, expected_voltage) in enumerate(test_data):
-            self.stm_manage.send_pin(pins)
-            self.power_unit.voltage_change(voltage, True)
-            time.sleep(1)  # Подождать, чтобы обеспечить устойчивое измерение
-            measured_voltage = self.mu_manage.parametr()["real_voltage"]
-            print(f"Измеренное напряжение: {measured_voltage} В")
-            if abs(float(measured_voltage) - expected_voltage) > 0.5:
-                print("Ошибка: Измеренное напряжение не соответствует ожидаемому")
-                return
+            self.log_text.insert(tk.END, f"Статус подключения {device} к порту {port}: {color}\n")
+            self.log_text.see(tk.END)
 
-            if i == len(test_data) - 1:
-                print("Тест успешно завершен")
-                return
+    # Запуск функции в течение заданного времени с паузами и запись данных в новый файл
+    def run_for_duration(self, duration_minutes, pause_time):
+        total_time = (duration_minutes * 60) +1  # Преобразование минут в секунды
+        start_time = time.time()
 
-            self.stm_manage.send_pin('11111')
+        # Генерация имени файла с учетом времени начала теста
+        start_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"test_results_{start_time_str}.txt"
 
-        self.stm_manage.__del__()
+        with open(filename, 'w') as file:
+            file.write("№\tT\tU\tI\tt1\tt2\tU5, В\tU15, В\n")
+            minute_counter = 1  # Счетчик минут для поля T (время проведения теста)
+
+            while (time.time() - start_time) < total_time:
+                test_data = self.form_list(minute_counter)  # Сбор данных
+                data_with_empty = test_data + ["", ""]  # Добавляем пустые столбцы для U5, В и U15, В
+                file.write("\t".join(str(x) for x in data_with_empty) + "\n")  # Запись данных в файл
+                minute_counter += pause_time
+                self.test_counter += 1
+                time.sleep(pause_time * 60)  # Пауза
+
+        self.test_counter = 1
+        self.log_text.insert(tk.END, f"Файл с результатами теста сформирован: {filename}\n")
+        self.log_text.insert(tk.END, "Вы можете открыть файл и просмотреть результаты.\n")
+        self.log_text.see(tk.END)
+
+    def open_input_window(self):
+        def on_submit():
+            try:
+                duration = int(duration_entry.get())
+                pause_time = int(pause_entry.get())
+                threading.Thread(target=self.run_for_duration, args=(duration, pause_time)).start()
+                input_window.destroy()
+            except ValueError:
+                self.log_text.insert(tk.END, "Ошибка: введите корректные значения.\n")
+
+        input_window = tk.Toplevel(self.master)
+        input_window.title("Введите время")
+
+        duration_label = tk.Label(input_window, text="Введите время работы в минутах:")
+        duration_label.pack(padx=10, pady=5)
+
+        duration_entry = tk.Entry(input_window)
+        duration_entry.pack(padx=10, pady=5)
+
+        pause_label = tk.Label(input_window, text="Введите паузу в минутах:")
+        pause_label.pack(padx=10, pady=5)
+
+        pause_entry = tk.Entry(input_window)
+        pause_entry.pack(padx=10, pady=5)
+
+        submit_button = tk.Button(input_window, text="Запустить", command=on_submit)
+        submit_button.pack(padx=10, pady=10)
+
+    # Сбор данных с устройств и возврат списка данных
+    def form_list(self, minute_counter):
+        test_data = [self.test_counter, minute_counter, 0, 0, 0, 0]  # Добавление счетчика тестов и минут
+        self.power_unit = PowerUnit(self.device_vars[1].get(), 115200)
+        power_data = self.power_unit.status_poll()
+        power_data = self.power_unit.decode_response(power_data, channel=1)
+        test_data[2], test_data[3] = float(power_data['real_voltage']), float(power_data['real_current'])
+
+        self.anbai = anbai(self.device_vars[0].get(), 9600)
+        temp_list = self.anbai.temperature()
+        test_data[4], test_data[5] = temp_list[0], temp_list[1]
+
         self.power_unit.__del__()
-        self.mu_manage.__del__()
-        pass
+        self.anbai.__del__()
+        iteration_time = 'Итерация №' + str(test_data[0]) + ' Время ' + str(test_data[1]) + 'мин.\n'
+        results_for_log = ('U = ' + str(test_data[2]) + ' I = ' + str(test_data[3]) + ' t1 = ' + str(test_data[4]) +
+                           ' t2 = ' + str(test_data[5]) + '\n')
+        self.log_text.insert(tk.END, iteration_time)
+        self.log_text.insert(tk.END, results_for_log)
+        return test_data
 
-    def send_down_command(self):
-        # self.serial_port.write(b'DOWN\n')
-        pass
+        # Сбор данных с устройств и возврат списка данных
+    def form_list_now(self):
+            test_data = [0, 0, 0, 0, 0, 0]
+            self.power_unit = PowerUnit(self.device_vars[1].get(), 115200)
+            power_data = self.power_unit.status_poll()
+            power_data = self.power_unit.decode_response(power_data, channel=1)
+            test_data[2], test_data[3] = float(power_data['real_voltage']), float(power_data['real_current'])
 
-    def start_automatic_control(self):
-        # for i = 3:
-        #     check_mu = check_mu
+            self.anbai = anbai(self.device_vars[0].get(), 9600)
+            temp_list = self.anbai.temperature()
+            test_data[4], test_data[5] = temp_list[0], temp_list[1]
 
-        pass
+            self.power_unit.__del__()
+            self.anbai.__del__()
+            iteration_time = 'Итерация №' + str(test_data[0]) + ' Время ' + str(test_data[1]) + 'мин.\n'
+            results_for_log = ('U = ' + str(test_data[2]) + ' I = ' + str(test_data[3]) + ' t1 = ' + str(test_data[4]) +
+                               ' t2 = ' + str(test_data[5]) + '\n')
+            self.log_text.insert(tk.END, iteration_time)
+            self.log_text.insert(tk.END, results_for_log)
+            return test_data
 
-    # класс для вывода в терминал в интерфейсе
-    class CustomStdout:
-        def __init__(self, text_widget):
-            self.text_widget = text_widget
-
-        # def write(self, string):
-        #     current_time = datetime.now().strftime("[%H:%M:%S]")
-        #     self.text_widget.insert(tk.END, current_time + string)
-        #     self.text_widget.see(tk.END)
-
-
-# Создаем основное окно
+# Создание основного окна приложения
 root = tk.Tk()
-# Запускаем приложение
 app = TestStandControlApp(root)
-# Запускаем цикл обработки событий
 root.mainloop()
-

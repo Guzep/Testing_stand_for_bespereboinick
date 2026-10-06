@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Test results and local outputs
+results/*
+!results/.gitkeep
+*.xlsx
+output.txt
+output.xlsx
+test_results_*.txt
+
+# Secrets / local config overrides
+local_config.py
+*.log
